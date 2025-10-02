@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>피싱 사이트 관리</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚨 피싱 사이트 관리</h1>
+
+        <div class="admin-section">
+            <form id="add-form">
+                <input type="text" id="new-site-input" placeholder="차단할 사이트 주소 입력" required>
+                <button type="submit">추가</button>
+            </form>
+        </div>
+
+        <div class="blacklist-table">
+            <h2>블랙리스트</h2>
+            <ul id="blacklist">
+            </ul>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+
+</html>

@@ -8,12 +8,9 @@ body.status-initial { background-color: #212529; }
 body.status-safe { background-color: #28a745; }
 body.status-danger { background-color: #dc3545; }
 
-/* 어두운 배경에서 h1 제목이 잘 보이도록 색상 변경 */
-body.status-initial .container h1,
-body.status-danger .container h1,
-body.status-safe .container h1 {
-  color: #ffffff;
-}
+/* [수정됨] body 상태에 따라 h1 색상이 바뀌는 코드를 삭제했습니다.
+   이제 h1은 항상 기본값인 검은색으로 표시됩니다.
+*/
 
 /* 기존 .container 및 기타 스타일 */
 .container {
@@ -29,7 +26,7 @@ h1 {
   font-size: 2rem;
   font-weight: 600;
   text-align: center;
-  color: #007bff;
+  color: black; /* 이 속성이 계속 적용됩니다. */
   margin-bottom: 2rem;
   transition: color 0.5s ease;
 }

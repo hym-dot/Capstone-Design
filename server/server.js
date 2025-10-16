@@ -1,20 +1,44 @@
 const express = require('express');
 const cors = require('cors');
 const db = require('./database.js');
+const axios = require('axios'); // 외부 API 요청을 위한 axios 추가
 
 const app = express();
 const port = 3001;
 
+// 1. 원격 블랙리스트 URL 정의
+const BLACKLIST_URL = 'https://raw.githubusercontent.com/lyb5382/phishguard-db-manager/main/blacklist.json';
+
+// 2. 원격 블랙리스트를 메모리에 저장할 변수 (캐시)
+let remoteBlacklist = [];
+
+// 3. 원격 블랙리스트를 가져와 캐시를 업데이트하는 함수
+async function fetchRemoteBlacklist() {
+  try {
+    console.log('Fetching remote blacklist...');
+    const response = await axios.get(BLACKLIST_URL);
+
+    // 데이터 형식이 { "urls": [{ "url": "..." }] } 일 것을 예상하고 url 값만 추출
+    if (response.data && Array.isArray(response.data.urls)) {
+      remoteBlacklist = response.data.urls.map(item => item.url);
+      console.log(`✅ Successfully fetched ${remoteBlacklist.length} items from remote blacklist.`);
+    } else {
+      console.warn('⚠️ Remote blacklist format is not as expected or is empty.');
+      remoteBlacklist = [];
+    }
+  } catch (error) {
+    console.error('❌ Error fetching remote blacklist:', error.message);
+  }
+}
+
 app.use(cors());
 app.use(express.json());
 
-// URL의 특징을 분석하는 자동 분석 함수
+// URL의 특징을 분석하는 자동 분석 함수 (기존 코드와 동일)
 function analyzeUrlHeuristically(urlString) {
-  // IP 주소 형식인지 확인하는 정규식
   const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
-  // 만약 입력값이 순수 IP 주소 형태이면, URL 분석을 하지 않고 통과시킴
   if (ipRegex.test(urlString)) {
-      return null;
+    return null;
   }
 
   try {
@@ -59,11 +83,14 @@ function analyzeUrlHeuristically(urlString) {
   }
 }
 
-// API 로직: '타입'에 상관없이 '값'을 분석
+// 4. API 로직 수정: 원격 블랙리스트 확인 기능 추가
 app.post('/api/check', (req, res) => {
   const { type, value } = req.body;
+  if (!value) {
+    return res.status(400).json({ error: '값이 비어있습니다.' });
+  }
 
-  // 1. 수동 DB에서 먼저 확인 (타입과 값이 일치하는 경우)
+  // 1. 수동 DB에서 먼저 확인
   db.get("SELECT * FROM items WHERE type = ? AND value = ?", [type, value], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
 
@@ -71,25 +98,67 @@ app.post('/api/check', (req, res) => {
       return res.json({ isBlacklisted: true, reason: '사용자가 직접 등록한 블랙리스트 항목입니다.' });
     }
 
-    // 2. DB에 없으면, '타입'에 상관없이 '값' 자체를 자동 분석
+    // 2. 원격 블랙리스트에서 확인 (새로 추가된 로직)
+    if (remoteBlacklist.includes(value)) {
+      return res.json({ isBlacklisted: true, reason: '외부 기관에 의해 등록된 피싱 사이트입니다.' });
+    }
+
+    // 3. DB에 없으면, 자동 분석
     const heuristicReason = analyzeUrlHeuristically(value);
     if (heuristicReason) {
-      // 자동 분석에서 걸리면 위험하다고 응답
       return res.json({ isBlacklisted: true, reason: heuristicReason });
     }
 
-    // 3. 모든 검사를 통과하면 안전하다고 응답
+    // 4. 모든 검사를 통과하면 안전
     res.json({ isBlacklisted: false });
   });
 });
 
-// 나머지 API들
+// 블랙리스트 전체 목록 가져오기 (기존 코드와 동일)
 app.get('/api/blacklist', (req, res) => {
-    db.all("SELECT * FROM items ORDER BY createdAt DESC", [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ data: rows });
-    });
+  db.all("SELECT * FROM items ORDER BY createdAt DESC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ data: rows });
+  });
 });
 
+// 블랙리스트에 새 항목 추가하기 (기존 코드와 동일)
 app.post('/api/blacklist', (req, res) => {
-    db.run("INSERT INTO items (type, value) VALUES (?, ?)", [req.body.type, req.body
+  const { type, value } = req.body;
+  if (!type || !value) {
+    return res.status(400).json({ error: '타입(type)과 값(value)을 모두 입력해야 합니다.' });
+  }
+
+  db.run("INSERT INTO items (type, value) VALUES (?, ?)", [type, value], function (err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(201).json({ id: this.lastID, type, value });
+  });
+});
+
+// 블랙리스트 항목 삭제하기 (기존 코드와 동일)
+app.delete('/api/blacklist/:id', (req, res) => {
+  const { id } = req.params;
+  db.run("DELETE FROM items WHERE id = ?", id, function (err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (this.changes === 0) {
+      return res.status(404).json({ error: '해당 ID를 찾을 수 없습니다.' });
+    }
+    res.status(200).json({ message: '성공적으로 삭제되었습니다.' });
+  });
+});
+
+
+// 서버 시작
+app.listen(port, () => {
+  console.log(`🚀 Server is running on http://localhost:${port}`);
+
+  // 5. 서버 시작 시 즉시 원격 블랙리스트를 가져옴
+  fetchRemoteBlacklist();
+
+  // 6. 주기적으로 (예: 6시간마다) 목록을 자동 갱신
+  setInterval(fetchRemoteBlacklist, 6 * 60 * 60 * 1000);
+});

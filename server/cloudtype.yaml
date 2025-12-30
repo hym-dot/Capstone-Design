@@ -1,0 +1,9 @@
+name: phishing-blocker-server
+app: node@18
+buildenv: []
+build: npm install
+start: npm start
+port: 3001
+context:
+  git:
+    root: server

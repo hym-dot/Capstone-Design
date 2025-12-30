@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
+// API URL 설정 (환경 변수 또는 기본값 사용)
+const API_URL = process.env.REACT_APP_API_URL || '';
+
 function App() {
   const [type, setType] = useState('ip');
   const [value, setValue] = useState('');
@@ -21,7 +24,7 @@ function App() {
     }
 
     const debounceTimer = setTimeout(() => {
-      axios.post('/api/check', { type, value })
+      axios.post(`${API_URL}/api/check`, { type, value })
         .then(response => {
           setResult(response.data);
           if (response.data.isBlacklisted) {
@@ -55,10 +58,10 @@ function App() {
     }
   }, [result]);
 
-  const fetchBlacklist = async () => { try { const response = await axios.get('/api/blacklist'); setBlacklist(response.data.data); } catch (error) { console.error("블랙리스트 로딩 실패:", error); } };
+  const fetchBlacklist = async () => { try { const response = await axios.get(`${API_URL}/api/blacklist`); setBlacklist(response.data.data); } catch (error) { console.error("블랙리스트 로딩 실패:", error); } };
   useEffect(() => { fetchBlacklist(); }, []);
-  const handleAddItem = async (e) => { e.preventDefault(); if (!newValue) { alert('추가할 값을 입력해주세요.'); return; } try { await axios.post('/api/blacklist', { type: newType, value: newValue }); setNewValue(''); fetchBlacklist(); } catch (error) { alert('추가 실패: ' + (error.response?.data?.error || '서버 오류')); } };
-  const handleDeleteItem = async (id) => { if (window.confirm('정말로 삭제하시겠습니까?')) { try { await axios.delete(`/api/blacklist/${id}`); fetchBlacklist(); } catch (error) { alert('삭제 중 오류가 발생했습니다.'); } } };
+  const handleAddItem = async (e) => { e.preventDefault(); if (!newValue) { alert('추가할 값을 입력해주세요.'); return; } try { await axios.post(`${API_URL}/api/blacklist`, { type: newType, value: newValue }); setNewValue(''); fetchBlacklist(); } catch (error) { alert('추가 실패: ' + (error.response?.data?.error || '서버 오류')); } };
+  const handleDeleteItem = async (id) => { if (window.confirm('정말로 삭제하시겠습니까?')) { try { await axios.delete(`${API_URL}/api/blacklist/${id}`); fetchBlacklist(); } catch (error) { alert('삭제 중 오류가 발생했습니다.'); } } };
 
   const closePopup = () => {
     setShowPopup(false);

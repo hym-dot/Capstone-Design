@@ -31,7 +31,24 @@ async function fetchRemoteBlacklist() {
   }
 }
 
-app.use(cors());
+// CORS 설정 - 배포 시 Vercel URL 추가 필요
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  process.env.CLIENT_URL // 배포 시 환경 변수로 설정
+].filter(Boolean);
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // origin이 없거나 (같은 출처) allowedOrigins에 있으면 허용
+    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      callback(null, true); // 개발 중에는 모두 허용
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 // URL의 특징을 분석하는 자동 분석 함수 (기존 코드와 동일)
